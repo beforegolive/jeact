@@ -14,7 +14,7 @@ function createTextElement(text) {
   return {
     type: 'TEXT_ELEMENT',
     props: {
-      nodeValue: text,
+      nodeValue: text + '-J',
       children: [],
     },
   }
@@ -23,7 +23,7 @@ function createTextElement(text) {
 function render(element, container) {
   // const dom = document.createElement(element.type)
   const dom =
-    element.type == 'TEXT_ELEMENT'
+    element.type === 'TEXT_ELEMENT'
       ? document.createTextNode('')
       : document.createElement(element.type)
 
@@ -53,9 +53,9 @@ const Jeact = {
 // 下面的标记会触发babel用我们自己定义的方法处理jsx代码
 /** @jsx Jeact.createElement */
 const element = (
-  <div id="foo">
-    <a>bar</a>
-    <b />
+  <div style="background: salmon">
+    <h1>Hello World</h1>
+    <h2 style="text-align: right">from Jeact</h2>
   </div>
 )
 
