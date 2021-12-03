@@ -254,9 +254,49 @@ function updateHostComponent(fiber) {
   reconcileChildren(fiber, elements)
 }
 
+let wipFiberForState = null
+let hookIndex = null
+
 function updateFunctionComponent(fiber) {
+  wipFiberForState = fiber
+  hookIndex = 0
+  wipFiberForState.hooks = []
   const children = [fiber.type(fiber.props)]
   reconcileChildren(fiber, children)
+}
+
+function useState(initial) {
+  // TODO
+  const oldHook =
+    wipFiberForState.alternate &&
+    wipFiberForState.alternate.hooks &&
+    wipFiberForState.alternate.hooks[hookIndex]
+
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  }
+
+  const actions = oldHook ? oldHook.queue : []
+  actions.forEach((action) => {
+    hook.state = action(hook.state)
+  })
+
+  const setState = (action) => {
+    hook.queue.push(action)
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    }
+
+    nextUnitOfWork = wipRoot
+    deletions = []
+  }
+
+  wipFiberForState.hooks.push(hook)
+  hookIndex++
+  return [hook.state, setState]
 }
 
 function performUnitOfWork(fiber) {
@@ -290,6 +330,7 @@ function performUnitOfWork(fiber) {
 const Jeact = {
   createElement,
   render,
+  useState,
 }
 
 // const element = Jeact.createElement(
@@ -308,11 +349,12 @@ const Jeact = {
 // )
 
 /** @jsx Jeact.createElement */
-function App(props) {
-  return <h1>Hi {props.name}</h1>
+function Counter() {
+  const [state, setState] = Jeact.useState(1)
+  return <h1 onClick={() => setState((c) => c + 1)}>Count: {state}</h1>
 }
 
-const element = <App name="foo123" />
+const element = <Counter />
 const container = document.getElementById('root')
 
 Jeact.render(element, container)
