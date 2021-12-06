@@ -1,3 +1,4 @@
+/** @jsx Jeact.createElement */
 const Jeact = importFromBelow()
 
 const stories = [
@@ -23,55 +24,35 @@ const stories = [
   },
 ]
 
-const appElement = {
-  type: 'div',
-  props: {
-    children: [
-      {
-        type: 'ul',
-        props: {
-          children: stories.map(storyElement),
-        },
-      },
-    ],
-  },
-}
+const appElement = (
+  <div>
+    <ul>{stories.map(storyElement)}</ul>
+  </div>
+)
 
 function storyElement({ name, url }) {
   const likes = Math.ceil(Math.random() * 100)
-  const buttonElement = {
-    type: 'button',
-    props: {
-      children: [
-        { type: 'TEXT ELEMENT', props: { nodeValue: likes } },
-        { type: 'TEXT ELEMENT', props: { nodeValue: '❤️' } },
-      ],
-    },
-  }
-
-  const linkElement = {
-    type: 'a',
-    props: {
-      href: url,
-      children: [{ type: 'TEXT ELEMENT', props: { nodeValue: name } }],
-    },
-  }
-
-  return {
-    type: 'li',
-    props: {
-      children: [buttonElement, linkElement],
-    },
-  }
+  return (
+    <li>
+      <button>
+        {likes}
+        <span role="img" aria-label="">
+          ❤️
+        </span>
+      </button>
+      <a href={url}>{name}</a>
+    </li>
+  )
 }
 
 Jeact.render(appElement, document.getElementById('root'))
 
 function importFromBelow() {
+  const TEXT_ELEMENT = 'TEXT ELEMENT'
   function render(element, parentDom) {
     const { type, props } = element
 
-    const isTextElement = type === 'TEXT ELEMENT'
+    const isTextElement = type === TEXT_ELEMENT
     const dom = isTextElement
       ? document.createTextNode('')
       : document.createElement(type)
@@ -98,5 +79,19 @@ function importFromBelow() {
     parentDom.appendChild(dom)
   }
 
-  return { render }
+  function createElement(type, config, ...args) {
+    const props = Object.assign({}, config)
+    const hasChildren = args.length > 0
+    const rawChildren = hasChildren ? [].concat(...args) : []
+    props.children = rawChildren
+      .filter((c) => c !== null && c !== false)
+      .map((c) => (c instanceof Object ? c : createTextElement(c)))
+    return { type, props }
+  }
+
+  function createTextElement(value) {
+    return createElement(TEXT_ELEMENT, { nodeValue: value })
+  }
+
+  return { render, createElement }
 }
