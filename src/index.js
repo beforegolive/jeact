@@ -1,63 +1,74 @@
 /** @jsx Jeact.createElement */
 const Jeact = importFromBelow()
 
-const randomLikes = () => Math.ceil(Math.random() * 100)
-
 const stories = [
   {
     name: 'Jeact Introduction copied from Didact',
     url: 'http://bit.ly/2pX7HNn',
-    likes: randomLikes(),
   },
   {
     name: 'Rendering DOM elements',
     url: 'http://bit.ly/2qCOejH',
-    likes: randomLikes(),
   },
   {
     name: 'Element creation and JSX',
     url: 'http://bit.ly/2qGbw8S',
-    likes: randomLikes(),
   },
   {
     name: 'Instances and reconciliation',
     url: 'http://bit.ly/2q4A746',
-    likes: randomLikes(),
   },
   {
     name: 'Components and state',
     url: 'http://bit.ly/2rE16nh',
-    likes: randomLikes(),
   },
 ]
 
-const appElement = () => (
-  <div>
-    <ul>{stories.map(storyElement)}</ul>
-  </div>
-)
-
-function storyElement(story) {
-  const { name, url, likes } = story
-  return (
-    <li>
-      <button onClick={(e) => handleClick(story)}>
-        {likes}
-        <span role="img" aria-label="">
-          ❤️
-        </span>
-      </button>
-      <a href={url}>{name}</a>
-    </li>
-  )
+class App extends Jeact.Component {
+  render() {
+    return (
+      <div>
+        <h1>Jeact Stories</h1>
+        <ul>
+          {this.props.stories.map((story) => {
+            return <Story name={story.name} url={story.url} />
+          })}
+        </ul>
+      </div>
+    )
+  }
 }
 
-function handleClick(story) {
-  story.likes += 1
-  Jeact.render(appElement(), document.getElementById('root'))
+class Story extends Jeact.Component {
+  constructor(props) {
+    super(props)
+    this.state = { likes: Math.ceil(Math.random() * 100) }
+  }
+
+  like() {
+    this.setState({
+      likes: this.state.likes + 1,
+    })
+  }
+
+  render() {
+    const { name, url } = this.props
+    const { likes } = this.state
+    // const likesElement = <span />
+
+    return (
+      <li>
+        <button onClick={(e) => this.like()}>
+          {likes}
+          <b>❤️</b>
+        </button>
+        <a href={url}>{name}</a>
+      </li>
+    )
+  }
 }
 
-Jeact.render(appElement(), document.getElementById('root'))
+Jeact.render(<App stories={stories} />, document.getElementById('root'))
 
 function importFromBelow() {
   const TEXT_ELEMENT = 'TEXT ELEMENT'
@@ -80,17 +91,27 @@ function importFromBelow() {
       // Remove instance
       parentDom.removeChild(instance.dom)
       return null
-    } else if (instance.element.type === element.type) {
+    } else if (instance.element.type !== element.type) {
+      // Replace instance
+      const newInstance = instantiate(element)
+      parentDom.replaceChild(newInstance.dom, instance.dom)
+      return newInstance
+    } else if (typeof element.type === 'string') {
       // update instance
       updateDomProperties(instance.dom, instance.element.props, element.props)
       instance.childInstances = reconcileChildren(instance, element)
       instance.element = element
       return instance
     } else {
-      // Replace instance
-      const newInstance = instantiate(element)
-      parentDom.replaceChild(newInstance.dom, instance.dom)
-      return newInstance
+      // Update composite instance
+      instance.publicInstance.props = element.props
+      const childElement = instance.publicInstance.render()
+      const oldChildInstance = instance.childInstance
+      const childInstance = reconcile(parentDom, oldChildInstance, childElement)
+      instance.dom = childInstance.dom
+      instance.childInstance = childInstance
+      instance.element = element
+      return instance
     }
   }
 
@@ -113,20 +134,32 @@ function importFromBelow() {
 
   function instantiate(element) {
     const { type, props } = element
-    const isTextElement = type === 'TEXT ELEMENT'
-    const dom = isTextElement
-      ? document.createTextNode('')
-      : document.createElement(type)
+    const isDomElement = typeof type === 'string'
+    if (isDomElement) {
+      const isTextElement = type === 'TEXT ELEMENT'
+      const dom = isTextElement
+        ? document.createTextNode('')
+        : document.createElement(type)
 
-    updateDomProperties(dom, [], props)
+      updateDomProperties(dom, [], props)
 
-    const childElements = props.children || []
-    const childInstances = childElements.map(instantiate)
-    const childDoms = childInstances.map((childInstance) => childInstance.dom)
-    childDoms.forEach((childDom) => dom.appendChild(childDom))
+      const childElements = props.children || []
+      const childInstances = childElements.map(instantiate)
+      const childDoms = childInstances.map((childInstance) => childInstance.dom)
+      childDoms.forEach((childDom) => dom.appendChild(childDom))
 
-    const instance = { dom, element, childInstances }
-    return instance
+      const instance = { dom, element, childInstances }
+      return instance
+    } else {
+      const instance = {}
+      const publicInstance = createPublicInstance(element, instance)
+      const childElement = publicInstance.render()
+      const childInstance = instantiate(childElement)
+      const dom = childInstance.dom
+
+      Object.assign(instance, { dom, element, childInstance, publicInstance })
+      return instance
+    }
   }
 
   function updateDomProperties(dom, prevProps, nextProps) {
@@ -205,5 +238,30 @@ function importFromBelow() {
     return createElement(TEXT_ELEMENT, { nodeValue: value })
   }
 
-  return { render, createElement }
+  function createPublicInstance(element, internalInstance) {
+    const { type, props } = element
+    const publicInstance = new type(props)
+    publicInstance.__internalInstance = internalInstance
+    return publicInstance
+  }
+
+  class Component {
+    constructor(props) {
+      this.props = props
+      this.state = this.state || {}
+    }
+
+    setState(partialState) {
+      this.state = Object.assign({}, this.state, partialState)
+      updateInstance(this.__internalInstance)
+    }
+  }
+
+  function updateInstance(internalInstance) {
+    const parentDom = internalInstance.dom.parentNode
+    const element = internalInstance.element
+    reconcile(parentDom, internalInstance, element)
+  }
+
+  return { render, createElement, Component }
 }
